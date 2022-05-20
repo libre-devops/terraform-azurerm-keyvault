@@ -24,7 +24,7 @@ resource "azurerm_key_vault" "keyvault" {
       bypass         = var.settings.network.bypass
       default_action = try(var.settings.network.default_action, "Deny")
       ip_rules       = try(var.settings.network.ip_rules, null)
-      virtual_network_subnet_ids = try(var.settings.network.subnets, null)      ]
+      virtual_network_subnet_ids = try(var.settings.network.subnets, null)
     }
   }
 

@@ -3,7 +3,7 @@ resource "azurerm_key_vault" "keyvault" {
   name                            = var.kv_name
   location                        = var.location
   resource_group_name             = var.rg_name
-  tenant_id                       = var.client_config.tenant_id
+  tenant_id                       = var.tenant_id
   sku_name                        = lower(try(var.sku_name, "standard"))
   tags                            = var.tags
   enabled_for_deployment          = try(var.enabled_for_deployment, false)

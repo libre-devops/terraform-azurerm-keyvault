@@ -8,6 +8,7 @@ module "rg" {
   #  lock_level = "CanNotDelete" // Do not set this value to skip lock
 }
 
+#tfsec:ignore:azure-keyvault-no-purge tfsec:ignore:azure-keyvault-specify-network-acl
 module "keyvault" {
   source = "registry.terraform.io/libre-devops/keyvault/azurerm"
 

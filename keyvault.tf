@@ -1,5 +1,17 @@
 data "azurerm_client_config" "current_client" {
-count   = var.use_current_client == ture ? 1 : 0
+  count = var.use_current_client == true ? 1 : 0
+}
+
+resource "azurerm_key_vault_access_policy" "client_access" {
+  count        = var.use_current_client == true && var.give_current_client_full_access == true ? 1 : 0
+  key_vault_id = azurerm_key_vault.keyvault.id
+  tenant_id    = data.azurerm_client_config.current_client.tenant_id
+  object_id    = data.azurerm_client_config.current_client.object_id
+
+  key_permissions         = tolist(var.full_key_permissions)
+  secret_permissions      = tolist(var.full_secret_permissions)
+  certificate_permissions = tolist(var.full_certificate_permissions)
+  storage_permissions     = tolist(var.full_storage_permissions)
 }
 
 resource "azurerm_key_vault" "keyvault" {
@@ -25,9 +37,9 @@ resource "azurerm_key_vault" "keyvault" {
     for_each = lookup(var.settings, "network", null) == null ? [] : [1]
 
     content {
-      bypass         = var.settings.network.bypass
-      default_action = try(var.settings.network.default_action, "Deny")
-      ip_rules       = try(var.settings.network.ip_rules, null)
+      bypass                     = var.settings.network.bypass
+      default_action             = try(var.settings.network.default_action, "Deny")
+      ip_rules                   = try(var.settings.network.ip_rules, null)
       virtual_network_subnet_ids = try(var.settings.network.subnets, null)
     }
   }

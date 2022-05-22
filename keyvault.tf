@@ -5,8 +5,8 @@ data "azurerm_client_config" "current_client" {
 resource "azurerm_key_vault_access_policy" "client_access" {
   count        = var.use_current_client == true && var.give_current_client_full_access == true ? 1 : 0
   key_vault_id = azurerm_key_vault.keyvault.id
-  tenant_id    = data.azurerm_client_config.current_client.tenant_id
-  object_id    = data.azurerm_client_config.current_client.object_id
+  tenant_id    = element(data.azurerm_client_config.current_client.*.tenant_id, 0)
+  object_id    = element(data.azurerm_client_config.current_client.*.object_id, 0)
 
   key_permissions         = tolist(var.full_key_permissions)
   secret_permissions      = tolist(var.full_secret_permissions)

@@ -19,7 +19,7 @@ resource "azurerm_key_vault" "keyvault" {
   name                            = var.kv_name
   location                        = var.location
   resource_group_name             = var.rg_name
-  tenant_id                       = var.use_current_client == true ? element(data.azurerm_client_config.current_client.tenant_id, 0) : try(var.tenant_id, null)
+  tenant_id                       = var.use_current_client == true ? element(data.azurerm_client_config.current_client.*.tenant_id, 0) : try(var.tenant_id, null)
   sku_name                        = lower(try(var.sku_name, "standard"))
   tags                            = var.tags
   enabled_for_deployment          = try(var.enabled_for_deployment, false)

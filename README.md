@@ -1,24 +1,68 @@
 ```hcl
-module "rg" {
-  source = "registry.terraform.io/libre-devops/rg/azurerm"
-
-  rg_name  = "rg-${var.short}-${var.loc}-${terraform.workspace}-build" // rg-ldo-euw-dev-build
-  location = local.location                                            // compares var.loc with the var.regions var to match a long-hand name, in this case, "euw", so "westeurope"
-  tags     = local.tags
-
-  #  lock_level = "CanNotDelete" // Do not set this value to skip lock
+data "azurerm_client_config" "current_client" {
+  count = var.use_current_client == true ? 1 : 0
 }
 
-module "keyvault" {
-  source = "registry.terraform.io/libre-devops/keyvault/azurerm"
+resource "azurerm_key_vault_access_policy" "client_access" {
+  count        = var.use_current_client == true && var.give_current_client_full_access == true ? 1 : 0
+  key_vault_id = azurerm_key_vault.keyvault[0].id # Adjust index based on which key vault the policy should apply to
+  tenant_id    = element(data.azurerm_client_config.current_client.*.tenant_id, 0)
+  object_id    = element(data.azurerm_client_config.current_client.*.object_id, 0)
 
-  rg_name  = module.rg.rg_name
-  location = module.rg.rg_location
-  tags     = module.rg.rg_tags
+  key_permissions         = tolist(var.full_key_permissions)
+  secret_permissions      = tolist(var.full_secret_permissions)
+  certificate_permissions = tolist(var.full_certificate_permissions)
+  storage_permissions     = tolist(var.full_storage_permissions)
+}
 
-  kv_name                         = "kv-${var.short}-${var.loc}-${terraform.workspace}-01"
-  use_current_client              = true
-  give_current_client_full_access = true
+resource "azurerm_key_vault" "keyvault" {
+  for_each = { for vault, key_vault in var.key_vaults : vault => key_vault }
+
+  name                            = each.value.name
+  location                        = each.value.location
+  resource_group_name             = each.value.rg_name
+  sku_name                        = lower(each.value.sku_name)
+  tenant_id                       = var.use_current_client == true ? data.azurerm_client_config.current_client[0].tenant_id : each.value.tenant_id
+  enabled_for_deployment          = each.value.enabled_for_deployment
+  enabled_for_disk_encryption     = each.value.enabled_for_disk_encryption
+  enabled_for_template_deployment = each.value.enabled_for_template_deployment
+  enable_rbac_authorization       = each.value.enable_rbac_authorization
+  purge_protection_enabled        = each.value.purge_protection_enabled
+  soft_delete_retention_days      = each.value.soft_delete_retention_days
+  public_network_access_enabled   = each.value.public_network_access_enabled
+
+  dynamic "access_policy" {
+    for_each = each.value.access_policy != null ? each.value.access_policy : []
+    content {
+      tenant_id = access_policy.value.tenant_id
+      object_id = access_policy.value.object_id
+
+      key_permissions     = access_policy.value.key_permissions
+      secret_permissions  = access_policy.value.secret_permissions
+      storage_permissions = access_policy.value.storage_permissions
+    }
+  }
+
+  dynamic "network_acls" {
+    for_each = each.value.network_acls != null ? [each.value.network_acls] : []
+    content {
+      bypass                     = network_acls.value.bypass
+      default_action             = title(network_acls.value.default_action)
+      ip_rules                   = network_acls.value.ip_rules
+      virtual_network_subnet_ids = network_acls.value.virtual_network_subnet_ids
+    }
+  }
+
+  dynamic "contact" {
+    for_each = each.value.contact != null ? each.value.contact : []
+    content {
+      email = contact.value.email
+      name  = contact.value.name
+      phone = contact.value.phone
+    }
+  }
+
+  tags = each.value.tags
 }
 ```
 ## Requirements
@@ -47,36 +91,23 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_enable_rbac_authorization"></a> [enable\_rbac\_authorization](#input\_enable\_rbac\_authorization) | Whether key vault access policy or Azure rbac is used, default is false as the key vault access policy is the default behavior for this module | `bool` | `false` | no |
-| <a name="input_enabled_for_deployment"></a> [enabled\_for\_deployment](#input\_enabled\_for\_deployment) | Enable this keyvault for template deployments access | `bool` | `true` | no |
-| <a name="input_enabled_for_disk_encryption"></a> [enabled\_for\_disk\_encryption](#input\_enabled\_for\_disk\_encryption) | If this keyvault is enabled for disk encryption | `bool` | `true` | no |
-| <a name="input_enabled_for_template_deployment"></a> [enabled\_for\_template\_deployment](#input\_enabled\_for\_template\_deployment) | If this keyvault is enabled for ARM template deployments | `bool` | `true` | no |
 | <a name="input_full_certificate_permissions"></a> [full\_certificate\_permissions](#input\_full\_certificate\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Create",<br>  "Delete",<br>  "DeleteIssuers",<br>  "Get",<br>  "GetIssuers",<br>  "Import",<br>  "List",<br>  "ListIssuers",<br>  "ManageContacts",<br>  "ManageIssuers",<br>  "Purge",<br>  "Recover",<br>  "Restore",<br>  "SetIssuers",<br>  "Update"<br>]</pre> | no |
 | <a name="input_full_key_permissions"></a> [full\_key\_permissions](#input\_full\_key\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Create",<br>  "Decrypt",<br>  "Delete",<br>  "Encrypt",<br>  "Get",<br>  "Import",<br>  "List",<br>  "Purge",<br>  "Recover",<br>  "Restore",<br>  "Sign",<br>  "UnwrapKey",<br>  "Update",<br>  "Verify",<br>  "WrapKey"<br>]</pre> | no |
 | <a name="input_full_secret_permissions"></a> [full\_secret\_permissions](#input\_full\_secret\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Delete",<br>  "Get",<br>  "List",<br>  "Purge",<br>  "Recover",<br>  "Restore",<br>  "Set"<br>]</pre> | no |
 | <a name="input_full_storage_permissions"></a> [full\_storage\_permissions](#input\_full\_storage\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Delete",<br>  "DeleteSAS",<br>  "Get",<br>  "GetSAS",<br>  "List",<br>  "ListSAS",<br>  "Purge",<br>  "Recover",<br>  "RegenerateKey",<br>  "Restore",<br>  "Set",<br>  "SetSAS",<br>  "Update"<br>]</pre> | no |
-| <a name="input_give_current_client_full_access"></a> [give\_current\_client\_full\_access](#input\_give\_current\_client\_full\_access) | If you use your current client as the tenant id, do you wish to give it full access to the keyvault? this aids automation, and is thus enable by default for this module.  Disable for better security by setting to false | `bool` | `true` | no |
-| <a name="input_identity_ids"></a> [identity\_ids](#input\_identity\_ids) | Specifies a list of user managed identity ids to be assigned to the VM. | `list(string)` | `[]` | no |
-| <a name="input_identity_type"></a> [identity\_type](#input\_identity\_type) | The Managed Service Identity Type of this Virtual Machine. | `string` | `""` | no |
-| <a name="input_kv_name"></a> [kv\_name](#input\_kv\_name) | The name of the keyvault | `string` | n/a | yes |
-| <a name="input_location"></a> [location](#input\_location) | The location for this resource to be put in | `string` | n/a | yes |
-| <a name="input_purge_protection_enabled"></a> [purge\_protection\_enabled](#input\_purge\_protection\_enabled) | If purge protection is enabled, for automation, it is recomended to be disabled so you can delete it, but for security, it should be enabled.  defaults to false to | `bool` | `false` | no |
-| <a name="input_rg_name"></a> [rg\_name](#input\_rg\_name) | The name of the resource group, this module does not create a resource group, it is expecting the value of a resource group already exists | `string` | n/a | yes |
-| <a name="input_settings"></a> [settings](#input\_settings) | A map used for the settings blocks | `any` | `{}` | no |
-| <a name="input_sku_name"></a> [sku\_name](#input\_sku\_name) | The sku of your keyvault, defaults to standard | `string` | `"Standard"` | no |
-| <a name="input_soft_delete_retention_days"></a> [soft\_delete\_retention\_days](#input\_soft\_delete\_retention\_days) | The number of days for soft delete, defaults to 7 the minimum | `number` | `7` | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | A map of the tags to use on the resources that are deployed with this module. | `map(string)` | <pre>{<br>  "source": "terraform"<br>}</pre> | no |
-| <a name="input_tenant_id"></a> [tenant\_id](#input\_tenant\_id) | If you are not using current client\_config, set tenant id here | `string` | `null` | no |
-| <a name="input_use_current_client"></a> [use\_current\_client](#input\_use\_current\_client) | If you wish to use the current client config or not | `bool` | n/a | yes |
+| <a name="input_give_current_client_full_access"></a> [give\_current\_client\_full\_access](#input\_give\_current\_client\_full\_access) | If you use your current client as the tenant id, do you wish to give it full access to the keyvault? this aids automation, and is thus enable by default for this module.  Disable for better security by setting to false | `bool` | `false` | no |
+| <a name="input_key_vaults"></a> [key\_vaults](#input\_key\_vaults) | A list of key vaults to create | <pre>list(object({<br>    name                            = string<br>    location                        = string<br>    rg_name                         = string<br>    sku_name                        = optional(string, "standard")<br>    tenant_id                       = optional(string)<br>    enabled_for_deployment          = optional(bool, true)<br>    enabled_for_disk_encryption     = optional(bool, true)<br>    enabled_for_template_deployment = optional(bool, true)<br>    soft_delete_retention_days      = optional(number)<br>    public_network_access_enabled   = optional(bool)<br>    enable_rbac_authorization       = optional(bool, true)<br>    purge_protection_enabled        = optional(bool, false) # Easier for automation<br>    access_policy = optional(list(object({<br>      tenant_id           = string<br>      object_id           = string<br>      key_permissions     = list(string)<br>      secret_permissions  = list(string)<br>      storage_permissions = list(string)<br>    })))<br>    network_acls = optional(object({<br>      bypass                     = string<br>      default_action             = string<br>      ip_rules                   = list(string)<br>      virtual_network_subnet_ids = list(string)<br>    }))<br>    contact = optional(list(object({<br>      email = string<br>      name  = optional(string)<br>      phone = optional(string)<br>    })))<br>    tags = map(string)<br>  }))</pre> | `[]` | no |
+| <a name="input_use_current_client"></a> [use\_current\_client](#input\_use\_current\_client) | If you wish to use the current client config or not | `bool` | `true` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| <a name="output_full_certificate_permissions"></a> [full\_certificate\_permissions](#output\_full\_certificate\_permissions) | Full permissions to the certificate permission set, used as a variable in the module |
-| <a name="output_full_key_permissions"></a> [full\_key\_permissions](#output\_full\_key\_permissions) | Full permissions to the key permission set, used as a variable in the module |
-| <a name="output_full_secret_permissions"></a> [full\_secret\_permissions](#output\_full\_secret\_permissions) | Full permissions to the secret permission set, used as a variable in the module |
-| <a name="output_full_storage_permissions"></a> [full\_storage\_permissions](#output\_full\_storage\_permissions) | Full permissions to the storage permission set, used as a variable in the module |
-| <a name="output_kv_id"></a> [kv\_id](#output\_kv\_id) | The id of the keyvault |
-| <a name="output_kv_name"></a> [kv\_name](#output\_kv\_name) | The name of the keyvault |
-| <a name="output_kv_tenant_id"></a> [kv\_tenant\_id](#output\_kv\_tenant\_id) | The keyvault tenant id |
+| <a name="output_client_access_policy_certificate_permissions"></a> [client\_access\_policy\_certificate\_permissions](#output\_client\_access\_policy\_certificate\_permissions) | The key permissions of the client access policy. |
+| <a name="output_client_access_policy_id"></a> [client\_access\_policy\_id](#output\_client\_access\_policy\_id) | The ID of the client access policy. |
+| <a name="output_client_access_policy_key_permissions"></a> [client\_access\_policy\_key\_permissions](#output\_client\_access\_policy\_key\_permissions) | The key permissions of the client access policy. |
+| <a name="output_client_access_policy_secret_permissions"></a> [client\_access\_policy\_secret\_permissions](#output\_client\_access\_policy\_secret\_permissions) | The key permissions of the client access policy. |
+| <a name="output_key_vault_ids"></a> [key\_vault\_ids](#output\_key\_vault\_ids) | The IDs of the created Key Vaults. |
+| <a name="output_key_vault_locations"></a> [key\_vault\_locations](#output\_key\_vault\_locations) | The locations of the created Key Vaults. |
+| <a name="output_key_vault_names"></a> [key\_vault\_names](#output\_key\_vault\_names) | The names of the created Key Vaults. |
+| <a name="output_key_vault_uris"></a> [key\_vault\_uris](#output\_key\_vault\_uris) | The uris of the created Key Vaults. |

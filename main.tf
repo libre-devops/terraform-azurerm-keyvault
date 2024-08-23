@@ -52,14 +52,14 @@ resource "azurerm_key_vault" "keyvault" {
     }
   }
 
-  dynamic "contact" {
-    for_each = each.value.contact != null ? each.value.contact : []
-    content {
-      email = contact.value.email
-      name  = contact.value.name
-      phone = contact.value.phone
-    }
-  }
+  #   dynamic "contact" {
+  #     for_each = each.value.contact != null ? each.value.contact : []
+  #     content {
+  #       email = contact.value.email
+  #       name  = contact.value.name
+  #       phone = contact.value.phone
+  #     }
+  #   }
 
   tags = each.value.tags
 }

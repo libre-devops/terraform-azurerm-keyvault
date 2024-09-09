@@ -53,16 +53,45 @@ resource "azurerm_key_vault" "keyvault" {
     }
   }
 
-  #   dynamic "contact" {
-  #     for_each = each.value.contact != null ? each.value.contact : []
-  #     content {
-  #       email = contact.value.email
-  #       name  = contact.value.name
-  #       phone = contact.value.phone
-  #     }
-  #   }
-
   tags = each.value.tags
+}
+
+module "diagnostic_settings_custom" {
+  source = "../terraform-azurerm-diagnostic-settings"
+
+  for_each = {
+    for vault, key_vault in var.key_vaults : vault => key_vault
+    if key_vault.create_diagnostic_settings == true && key_vault.diagnostic_settings != null && key_vault.diagnostic_settings_enable_all_logs_and_metrics == false
+  }
+
+  diagnostic_settings = merge(
+    each.value.diagnostic_settings,
+    {
+      target_resource_id = azurerm_key_vault.keyvault[each.key].id,
+    }
+  )
+}
+
+module "diagnostic_settings_enable_all" {
+  source = "../terraform-azurerm-diagnostic-settings"
+
+  for_each = {
+    for vault, key_vault in var.key_vaults : vault => key_vault
+    if key_vault.create_diagnostic_settings == true && key_vault.diagnostic_settings_enable_all_logs_and_metrics == true
+  }
+
+  diagnostic_settings = {
+    target_resource_id             = azurerm_key_vault.keyvault[each.key].id
+    law_id                         = try(each.value.diagnostic_settings.law_id, null)
+    diagnostic_settings_name       = "${azurerm_key_vault.keyvault[each.key].name}-diagnostics"
+    enable_all_logs                = true
+    enable_all_metrics             = true
+    storage_account_id             = try(each.value.diagnostic_settings.storage_account_id, null)
+    eventhub_name                  = try(each.value.diagnostic_settings.eventhub_name, null)
+    eventhub_authorization_rule_id = try(each.value.diagnostic_settings.eventhub_authorization_rule_id, null)
+    law_destination_type           = each.value.diagnostic_settings.law_destination_type
+    partner_solution_id            = try(each.value.diagnostic_settings.partner_solution_id, null)
+  }
 }
 ```
 ## Requirements
@@ -77,7 +106,10 @@ No requirements.
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_diagnostic_settings_custom"></a> [diagnostic\_settings\_custom](#module\_diagnostic\_settings\_custom) | ../terraform-azurerm-diagnostic-settings | n/a |
+| <a name="module_diagnostic_settings_enable_all"></a> [diagnostic\_settings\_enable\_all](#module\_diagnostic\_settings\_enable\_all) | ../terraform-azurerm-diagnostic-settings | n/a |
 
 ## Resources
 
@@ -96,7 +128,7 @@ No modules.
 | <a name="input_full_secret_permissions"></a> [full\_secret\_permissions](#input\_full\_secret\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Delete",<br>  "Get",<br>  "List",<br>  "Purge",<br>  "Recover",<br>  "Restore",<br>  "Set"<br>]</pre> | no |
 | <a name="input_full_storage_permissions"></a> [full\_storage\_permissions](#input\_full\_storage\_permissions) | All the available permissions for key access | `list(string)` | <pre>[<br>  "Backup",<br>  "Delete",<br>  "DeleteSAS",<br>  "Get",<br>  "GetSAS",<br>  "List",<br>  "ListSAS",<br>  "Purge",<br>  "Recover",<br>  "RegenerateKey",<br>  "Restore",<br>  "Set",<br>  "SetSAS",<br>  "Update"<br>]</pre> | no |
 | <a name="input_give_current_client_full_access"></a> [give\_current\_client\_full\_access](#input\_give\_current\_client\_full\_access) | If you use your current client as the tenant id, do you wish to give it full access to the keyvault? this aids automation, and is thus enable by default for this module.  Disable for better security by setting to false | `bool` | `false` | no |
-| <a name="input_key_vaults"></a> [key\_vaults](#input\_key\_vaults) | A list of key vaults to create | <pre>list(object({<br>    name                            = string<br>    location                        = string<br>    rg_name                         = string<br>    sku_name                        = optional(string, "standard")<br>    tenant_id                       = optional(string)<br>    enabled_for_deployment          = optional(bool, true)<br>    enabled_for_disk_encryption     = optional(bool, true)<br>    enabled_for_template_deployment = optional(bool, true)<br>    soft_delete_retention_days      = optional(number)<br>    public_network_access_enabled   = optional(bool)<br>    enable_rbac_authorization       = optional(bool, true)<br>    purge_protection_enabled        = optional(bool, false) # Easier for automation<br>    access_policy = optional(list(object({<br>      tenant_id           = string<br>      object_id           = string<br>      key_permissions     = list(string)<br>      secret_permissions  = list(string)<br>      storage_permissions = list(string)<br>    })))<br>    network_acls = optional(object({<br>      bypass                     = string<br>      default_action             = string<br>      ip_rules                   = list(string)<br>      virtual_network_subnet_ids = list(string)<br>    }))<br>    contact = optional(list(object({<br>      email = string<br>      name  = optional(string)<br>      phone = optional(string)<br>    })))<br>    tags = map(string)<br>  }))</pre> | `[]` | no |
+| <a name="input_key_vaults"></a> [key\_vaults](#input\_key\_vaults) | A list of key vaults to create | <pre>list(object({<br>    name                            = string<br>    location                        = string<br>    rg_name                         = string<br>    sku_name                        = optional(string, "standard")<br>    tenant_id                       = optional(string)<br>    enabled_for_deployment          = optional(bool, true)<br>    enabled_for_disk_encryption     = optional(bool, true)<br>    enabled_for_template_deployment = optional(bool, true)<br>    soft_delete_retention_days      = optional(number)<br>    public_network_access_enabled   = optional(bool)<br>    enable_rbac_authorization       = optional(bool, true)<br>    purge_protection_enabled        = optional(bool, false) # Easier for automation<br>    access_policy = optional(list(object({<br>      tenant_id           = string<br>      object_id           = string<br>      key_permissions     = list(string)<br>      secret_permissions  = list(string)<br>      storage_permissions = list(string)<br>    })))<br>    network_acls = optional(object({<br>      bypass                     = string<br>      default_action             = string<br>      ip_rules                   = list(string)<br>      virtual_network_subnet_ids = list(string)<br>    }))<br>    contact = optional(list(object({<br>      email = string<br>      name  = optional(string)<br>      phone = optional(string)<br>    })))<br>    create_diagnostic_settings                      = optional(bool, false)<br>    diagnostic_settings_enable_all_logs_and_metrics = optional(bool, false)<br>    diagnostic_settings = optional(object({<br>      diagnostic_settings_name       = optional(string)<br>      storage_account_id             = optional(string)<br>      eventhub_name                  = optional(string)<br>      eventhub_authorization_rule_id = optional(string)<br>      law_id                         = optional(string)<br>      law_destination_type           = optional(string, "Dedicated")<br>      partner_solution_id            = optional(string)<br>      enabled_log = optional(list(object({<br>        category       = optional(string)<br>        category_group = optional(string)<br>      })), [])<br>      metric = optional(list(object({<br>        category = string<br>        enabled  = optional(bool, true)<br>      })), [])<br>      enable_all_logs    = optional(bool, false)<br>      enable_all_metrics = optional(bool, false)<br>    }), null)<br>    tags = map(string)<br>  }))</pre> | `[]` | no |
 | <a name="input_use_current_client"></a> [use\_current\_client](#input\_use\_current\_client) | If you wish to use the current client config or not | `bool` | `true` | no |
 
 ## Outputs

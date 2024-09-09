@@ -51,15 +51,31 @@ data "http" "user_ip" {
 }
 
 module "role_assignments" {
-  source = "libre-devops/role-assignment/azurerm"
+  source = "github.com/libre-devops/terraform-azurerm-role-assignment"
 
-  assignments = [
+  role_assignments = [
     {
-      role_definition_name = "Key Vault Administrator"
-      scope                = module.rg.rg_id
-      principal_id         = data.azurerm_client_config.current.object_id
+      principal_ids = [data.azurerm_client_config.current.object_id]
+      role_names    = ["Key Vault Administrator"]
+      scope         = module.rg.rg_id
+      set_condition = true
     },
   ]
+}
+module "law" {
+  source = "registry.terraform.io/libre-devops/log-analytics-workspace/azurerm"
+
+  rg_name  = module.rg.rg_name
+  location = module.rg.rg_location
+  tags     = module.rg.rg_tags
+
+  create_new_workspace       = true
+  law_name                   = "law-${var.short}-${var.loc}-${var.env}-01"
+  law_sku                    = "PerGB2018"
+  retention_in_days          = "30"
+  daily_quota_gb             = "0.5"
+  internet_ingestion_enabled = false
+  internet_query_enabled     = false
 }
 
 module "key_vault" {
@@ -71,12 +87,43 @@ module "key_vault" {
       rg_name  = module.rg.rg_name
       location = module.rg.rg_location
       tags     = module.rg.rg_tags
-      contact = [
-        {
-          name  = "LibreDevOps"
-          email = "info@libredevops.org"
-        }
-      ]
+
+      create_diagnostic_settings                      = true
+      diagnostic_settings_enable_all_logs_and_metrics = true
+      diagnostic_settings = {
+        law_id = module.law.law_id
+      }
+
+      enabled_for_deployment          = true
+      enabled_for_disk_encryption     = true
+      enabled_for_template_deployment = true
+      enable_rbac_authorization       = true
+      purge_protection_enabled        = false
+      public_network_access_enabled   = true
+      network_acls = {
+        default_action             = "Deny"
+        bypass                     = "AzureServices"
+        ip_rules                   = [chomp(data.http.user_ip.response_body)]
+        virtual_network_subnet_ids = [module.network.subnets_ids["subnet1"]]
+      }
+    },
+    {
+      name     = "kv-${var.short}-${var.loc}-${var.env}-tst-02"
+      rg_name  = module.rg.rg_name
+      location = module.rg.rg_location
+      tags     = module.rg.rg_tags
+
+      create_diagnostic_settings                      = true
+      diagnostic_settings_enable_all_logs_and_metrics = false
+      diagnostic_settings = {
+        law_id = module.law.law_id
+        enabled_log = [
+          {
+            category = "AuditEvent"
+          }
+        ]
+      }
+
       enabled_for_deployment          = true
       enabled_for_disk_encryption     = true
       enabled_for_template_deployment = true
@@ -101,18 +148,19 @@ No requirements.
 
 | Name | Version |
 |------|---------|
-| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 3.95.0 |
-| <a name="provider_http"></a> [http](#provider\_http) | 3.4.2 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.6.0 |
+| <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.1.0 |
+| <a name="provider_http"></a> [http](#provider\_http) | 3.4.4 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.6.2 |
 
 ## Modules
 
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_key_vault"></a> [key\_vault](#module\_key\_vault) | ../../ | n/a |
+| <a name="module_law"></a> [law](#module\_law) | registry.terraform.io/libre-devops/log-analytics-workspace/azurerm | n/a |
 | <a name="module_network"></a> [network](#module\_network) | libre-devops/network/azurerm | n/a |
 | <a name="module_rg"></a> [rg](#module\_rg) | libre-devops/rg/azurerm | n/a |
-| <a name="module_role_assignments"></a> [role\_assignments](#module\_role\_assignments) | libre-devops/role-assignment/azurerm | n/a |
+| <a name="module_role_assignments"></a> [role\_assignments](#module\_role\_assignments) | github.com/libre-devops/terraform-azurerm-role-assignment | n/a |
 | <a name="module_shared_vars"></a> [shared\_vars](#module\_shared\_vars) | libre-devops/shared-vars/azurerm | n/a |
 | <a name="module_subnet_calculator"></a> [subnet\_calculator](#module\_subnet\_calculator) | libre-devops/subnet-calculator/null | n/a |
 
@@ -122,10 +170,8 @@ No requirements.
 |------|------|
 | [random_string.entropy](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
-| [azurerm_key_vault.mgmt_kv](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault) | data source |
 | [azurerm_resource_group.mgmt_rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
-| [azurerm_ssh_public_key.mgmt_ssh_key](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/ssh_public_key) | data source |
-| [azurerm_user_assigned_identity.mgmt_user_assigned_id](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/user_assigned_identity) | data source |
+| [azurerm_user_assigned_identity.mgmt_id](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/user_assigned_identity) | data source |
 | [http_http.user_ip](https://registry.terraform.io/providers/hashicorp/http/latest/docs/data-sources/http) | data source |
 
 ## Inputs

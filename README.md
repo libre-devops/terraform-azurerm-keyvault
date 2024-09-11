@@ -57,7 +57,7 @@ resource "azurerm_key_vault" "keyvault" {
 }
 
 module "diagnostic_settings_custom" {
-  source = "../terraform-azurerm-diagnostic-settings"
+  source = "github.com/libre-devoops/terraform-azurerm-diagnostic-settings"
 
   for_each = {
     for vault, key_vault in var.key_vaults : vault => key_vault
@@ -73,7 +73,7 @@ module "diagnostic_settings_custom" {
 }
 
 module "diagnostic_settings_enable_all" {
-  source = "../terraform-azurerm-diagnostic-settings"
+  source = "github.com/libre-devoops/terraform-azurerm-diagnostic-settings"
 
   for_each = {
     for vault, key_vault in var.key_vaults : vault => key_vault
@@ -108,8 +108,8 @@ No requirements.
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_diagnostic_settings_custom"></a> [diagnostic\_settings\_custom](#module\_diagnostic\_settings\_custom) | ../terraform-azurerm-diagnostic-settings | n/a |
-| <a name="module_diagnostic_settings_enable_all"></a> [diagnostic\_settings\_enable\_all](#module\_diagnostic\_settings\_enable\_all) | ../terraform-azurerm-diagnostic-settings | n/a |
+| <a name="module_diagnostic_settings_custom"></a> [diagnostic\_settings\_custom](#module\_diagnostic\_settings\_custom) | github.com/libre-devoops/terraform-azurerm-diagnostic-settings | n/a |
+| <a name="module_diagnostic_settings_enable_all"></a> [diagnostic\_settings\_enable\_all](#module\_diagnostic\_settings\_enable\_all) | github.com/libre-devoops/terraform-azurerm-diagnostic-settings | n/a |
 
 ## Resources
 

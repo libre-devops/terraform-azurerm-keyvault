@@ -1,39 +1,39 @@
-output "client_access_policy_certificate_permissions" {
-  description = "The certificate permissions of the client access policy, keyed by Key Vault name."
-  value       = { for vault, policy in azurerm_key_vault_access_policy.client_access : vault => policy.certificate_permissions }
+output "ids" {
+  description = "Map of key vault name to its resource id."
+  value       = { for k, v in azurerm_key_vault.this : k => v.id }
 }
 
-output "client_access_policy_id" {
-  description = "The ID of the client access policy, keyed by Key Vault name."
-  value       = { for vault, policy in azurerm_key_vault_access_policy.client_access : vault => policy.id }
+output "ids_zipmap" {
+  description = "Map of key vault name to a { name, id } object, for passing where both are needed together."
+  value       = { for k, v in azurerm_key_vault.this : k => { name = v.name, id = v.id } }
 }
 
-output "client_access_policy_key_permissions" {
-  description = "The key permissions of the client access policy, keyed by Key Vault name."
-  value       = { for vault, policy in azurerm_key_vault_access_policy.client_access : vault => policy.key_permissions }
+output "names" {
+  description = "The key vault names."
+  value       = keys(azurerm_key_vault.this)
 }
 
-output "client_access_policy_secret_permissions" {
-  description = "The secret permissions of the client access policy, keyed by Key Vault name."
-  value       = { for vault, policy in azurerm_key_vault_access_policy.client_access : vault => policy.secret_permissions }
+output "resource_group_name" {
+  description = "Resource group name parsed from resource_group_id."
+  value       = local.resource_group_name
 }
 
-output "key_vault_ids" {
-  description = "The IDs of the created Key Vaults, keyed by vault name."
-  value       = { for vault, key_vault in azurerm_key_vault.keyvault : key_vault.name => key_vault.id }
+output "subscription_id" {
+  description = "Subscription id parsed from resource_group_id."
+  value       = local.rg.subscription_id
 }
 
-output "key_vault_locations" {
-  description = "The locations of the created Key Vaults, keyed by vault name."
-  value       = { for vault, key_vault in azurerm_key_vault.keyvault : key_vault.name => key_vault.location }
+output "tags" {
+  description = "The tags applied to the key vaults."
+  value       = var.tags
 }
 
-output "key_vault_names" {
-  description = "The names of the created Key Vaults, keyed by vault name."
-  value       = { for vault, key_vault in azurerm_key_vault.keyvault : key_vault.name => key_vault.name }
+output "tenant_id" {
+  description = "The tenant id the vaults are in."
+  value       = local.tenant_id
 }
 
-output "key_vault_uris" {
-  description = "The uris of the created Key Vaults, keyed by vault name."
-  value       = { for vault, key_vault in azurerm_key_vault.keyvault : key_vault.name => key_vault.vault_uri }
+output "vault_uris" {
+  description = "Map of key vault name to its data-plane URI."
+  value       = { for k, v in azurerm_key_vault.this : k => v.vault_uri }
 }
